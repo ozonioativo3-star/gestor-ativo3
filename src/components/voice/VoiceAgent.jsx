@@ -13,31 +13,26 @@ export default function VoiceAgent() {
 
   return (
     <div style={styles.container}>
-
-      {/* TÍTULO */}
       <div style={styles.titulo}>
         <span style={styles.nome}>Ativa</span>
         <span style={styles.subtitulo}>Assistente de voz do estúdio</span>
       </div>
 
-      {/* BOTÃO PRINCIPAL */}
       <div style={styles.btnWrap}>
         {cfg.pulso && <div style={{ ...styles.pulso, borderColor: cfg.cor }} />}
         <button
           style={{ ...styles.btn, background: cfg.cor }}
           onClick={status === 'idle' ? ouvir : parar}
         >
-          {status === 'idle'    && <MicIcon />}
-          {status === 'ouvindo' && <OndasIcon />}
-          {status === 'pensando'&& <SpinnerIcon />}
-          {status === 'falando' && <SpeakerIcon />}
+          {status === 'idle'     && <MicIcon />}
+          {status === 'ouvindo'  && <OndasIcon />}
+          {status === 'pensando' && <SpinnerIcon />}
+          {status === 'falando'  && <SpeakerIcon />}
         </button>
       </div>
 
-      {/* STATUS */}
       <p style={{ ...styles.statusLabel, color: cfg.cor }}>{cfg.label}</p>
 
-      {/* TRANSCRIÇÃO */}
       {transcricao && (
         <div style={styles.card}>
           <span style={styles.cardLabel}>Você disse</span>
@@ -45,7 +40,6 @@ export default function VoiceAgent() {
         </div>
       )}
 
-      {/* RESPOSTA */}
       {resposta && (
         <div style={{ ...styles.card, background: '#E1F5EE', borderColor: '#9FE1CB' }}>
           <span style={{ ...styles.cardLabel, color: '#0F6E56' }}>Ativa respondeu</span>
@@ -53,14 +47,10 @@ export default function VoiceAgent() {
         </div>
       )}
 
-      {/* LIMPAR */}
       {(transcricao || resposta) && (
-        <button style={styles.limpar} onClick={limparHistorico}>
-          Limpar conversa
-        </button>
+        <button style={styles.limpar} onClick={limparHistorico}>Limpar conversa</button>
       )}
 
-      {/* DICA */}
       {status === 'idle' && !transcricao && (
         <p style={styles.dica}>
           Diga "bom dia" para o resumo do dia,{'\n'}
@@ -71,7 +61,6 @@ export default function VoiceAgent() {
   )
 }
 
-// ─── ÍCONES SVG SIMPLES ──────────────────────────────────────────────
 const MicIcon = () => (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
     <rect x="9" y="2" width="6" height="11" rx="3"/>
@@ -96,7 +85,6 @@ const SpeakerIcon = () => (
   </svg>
 )
 
-// ─── ESTILOS ─────────────────────────────────────────────────────────
 const styles = {
   container: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 20px', gap: '16px', maxWidth: '420px', margin: '0 auto' },
   titulo: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' },

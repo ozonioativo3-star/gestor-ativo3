@@ -1,7 +1,6 @@
 import { supabase } from './supabase'
 
 // ─── FERRAMENTAS QUE O AGENTE PODE CHAMAR ───────────────────────────
-// Cada função busca dados reais do Supabase
 
 export async function buscarAgendamentosHoje() {
   const hoje = new Date().toISOString().split('T')[0]
@@ -60,16 +59,115 @@ export async function historicoCliente(clienteId) {
   return { historico: data || [] }
 }
 
-// ─── MAPA DE FERRAMENTAS PARA O AGENTE ──────────────────────────────
+export async function totalClientes() {
+  const { count, error } = await supabase
+    .from('clientes')
+    .select('*', { count: 'exact', head: true })
+  if (error) return { erro: error.message }
+  return { total: count }
+}
+
+export async function resumoFinanceiro() {
+  const hoje = new Date()
+  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0]
+  const { data, error } = await supabase
+    .from('agendamentos')
+    .select('valor, status')
+    .gte('data', inicioMes)
+  if (error) return { erro: error.message }
+  const total = data?.reduce((s, a) => s + (parseFloat(a.valor) || 0), 0) || 0
+  const concluidos = data?.filter(a => a.status === 'concluido').length || 0
+  const pendentes = data?.filter(a => a.status === 'pendente' || a.status === 'confirmado').length || 0
+  return {
+    total_mes: total.toFixed(2),
+    agendamentos_mes: data?.length || 0,
+    concluidos,
+    pendentes
+  }
+}
+
+export async function proximasClientes() {
+  const agora = new Date()
+  const hoje = agora.toISOString().split('T')[0]
+  const horaAtual = agora.toTimeString().slice(0, 5)
+  const { data, error } = await supabase
+    .from('agendamentos')
+    .select('*, clientes(nome, telefone, observacoes)')
+    .eq('data', hoje)
+    .gte('hora', horaAtual)
+    .order('hora', { ascending: true })
+    .limit(3)
+  if (error) return { erro: error.message }
+  return { proximas: data || [], total: data?.length || 0 }
+}
+
+export async function aniversariantesDoMes() {
+  // Busca clientes cadastrados este mês (aproximação para aniversariantes)
+  const hoje = new Date()
+  const mes = String(hoje.getMonth() + 1).padStart(2, '0')
+  const { data, error } = await supabase
+    .from('clientes')
+    .select('nome, telefone')
+    .limit(50)
+  if (error) return { erro: error.message }
+  return { clientes: data || [], mes: hoje.toLocaleString('pt-BR', { month: 'long' }) }
+}
+
+export async function servicosMaisVendidos() {
+  const hoje = new Date()
+  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0]
+  const { data, error } = await supabase
+    .from('agendamentos')
+    .select('servico')
+    .gte('data', inicioMes)
+  if (error) return { erro: error.message }
+  const contagem = {}
+  data?.forEach(a => {
+    if (a.servico) contagem[a.servico] = (contagem[a.servico] || 0) + 1
+  })
+  const ordenados = Object.entries(contagem)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([servico, quantidade]) => ({ servico, quantidade }))
+  return { servicos: ordenados }
+}
+
+export async function clientesFrequentes() {
+  const hoje = new Date()
+  const inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1).toISOString().split('T')[0]
+  const { data, error } = await supabase
+    .from('agendamentos')
+    .select('cliente_id, clientes(nome)')
+    .gte('data', inicio)
+  if (error) return { erro: error.message }
+  const contagem = {}
+  data?.forEach(a => {
+    const nome = a.clientes?.nome
+    if (nome) contagem[nome] = (contagem[nome] || 0) + 1
+  })
+  const ordenados = Object.entries(contagem)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([nome, visitas]) => ({ nome, visitas }))
+  return { clientes: ordenados }
+}
+
+// ─── MAPA DE FERRAMENTAS ─────────────────────────────────────────────
 export const ferramentas = {
   buscarAgendamentosHoje,
   buscarCliente,
   clientesSemRetorno,
   horariosVagosHoje,
   historicoCliente,
+  totalClientes,
+  resumoFinanceiro,
+  proximasClientes,
+  aniversariantesDoMes,
+  servicosMaisVendidos,
+  clientesFrequentes,
 }
 
-// ─── DEFINIÇÃO DAS FERRAMENTAS PARA A API DO CLAUDE ─────────────────
+// ─── DEFINIÇÃO PARA A API DO CLAUDE ─────────────────────────────────
 export const toolDefinitions = [
   {
     name: 'buscarAgendamentosHoje',
@@ -107,5 +205,35 @@ export const toolDefinitions = [
       properties: { clienteId: { type: 'string', description: 'ID da cliente' } },
       required: ['clienteId']
     }
-  }
+  },
+  {
+    name: 'totalClientes',
+    description: 'Retorna o total de clientes cadastradas no sistema',
+    input_schema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'resumoFinanceiro',
+    description: 'Retorna o total faturado no mês, agendamentos concluídos e pendentes',
+    input_schema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'proximasClientes',
+    description: 'Retorna as próximas clientes que chegam hoje a partir do horário atual',
+    input_schema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'aniversariantesDoMes',
+    description: 'Lista clientes do mês atual para ações de relacionamento',
+    input_schema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'servicosMaisVendidos',
+    description: 'Lista os serviços mais realizados no mês atual',
+    input_schema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'clientesFrequentes',
+    description: 'Lista as clientes que mais visitaram o estúdio nos últimos 2 meses',
+    input_schema: { type: 'object', properties: {}, required: [] }
+  },
 ]

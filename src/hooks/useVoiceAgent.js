@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { chamarAgente } from '../lib/agent'
 
 export function useVoiceAgent() {
@@ -7,6 +7,10 @@ export function useVoiceAgent() {
   const [resposta, setResposta] = useState('')
   const [historico, setHistorico] = useState([])
   const recognitionRef = useRef(null)
+  const statusRef = useRef('idle')
+
+  // Mantém o ref sincronizado com o estado
+  useEffect(() => { statusRef.current = status }, [status])
 
   const falar = useCallback((texto) => {
     window.speechSynthesis.cancel()
@@ -21,25 +25,74 @@ export function useVoiceAgent() {
       || vozes.find(v => v.lang.includes('pt'))
       || vozes[0]
     if (vozPT) utterance.voice = vozPT
-    utterance.onstart = () => setStatus('falando')
-    utterance.onend = () => setStatus('idle')
+    utterance.onstart = () => {
+      setStatus('falando')
+      // Inicia escuta em segundo plano para detectar interrupção
+      iniciarEscutaInterrupcao()
+    }
+    utterance.onend = () => {
+      if (statusRef.current === 'falando') setStatus('idle')
+    }
+    utterance.onerror = () => setStatus('idle')
     window.speechSynthesis.speak(utterance)
   }, [])
 
+  // Escuta em segundo plano enquanto fala — detecta interrupção
+  const iniciarEscutaInterrupcao = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) return
+
+    const recognition = new SpeechRecognition()
+    recognition.lang = 'pt-BR'
+    recognition.continuous = false
+    recognition.interimResults = true
+
+    recognition.onresult = async (event) => {
+      const texto = event.results[0][0].transcript
+      if (!texto || texto.length < 2) return
+
+      // Para a fala imediatamente
+      window.speechSynthesis.cancel()
+      recognition.stop()
+      setStatus('pensando')
+      setTranscricao(texto)
+
+      try {
+        const novoHistorico = [...historico, { role: 'user', content: texto }]
+        const respAgente = await chamarAgente(texto, historico)
+        setResposta(respAgente)
+        setHistorico([...novoHistorico, { role: 'assistant', content: respAgente }])
+        falar(respAgente)
+      } catch {
+        setResposta('Erro. Tente novamente.')
+        setStatus('idle')
+      }
+    }
+
+    recognition.onerror = () => {}
+    try { recognition.start() } catch {}
+  }, [historico, falar])
+
   const ouvir = useCallback(() => {
+    window.speechSynthesis.cancel()
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) {
-      alert('Use o Google Chrome para reconhecimento de voz.')
+      alert('Use o Google Chrome.')
       return
     }
+
     const recognition = new SpeechRecognition()
     recognition.lang = 'pt-BR'
     recognition.continuous = false
     recognition.interimResults = false
     recognitionRef.current = recognition
+
     recognition.onstart = () => setStatus('ouvindo')
+
     recognition.onresult = async (event) => {
       const texto = event.results[0][0].transcript
+      window.speechSynthesis.cancel()
       setTranscricao(texto)
       setStatus('pensando')
       try {
@@ -49,27 +102,32 @@ export function useVoiceAgent() {
         setHistorico([...novoHistorico, { role: 'assistant', content: respAgente }])
         falar(respAgente)
       } catch {
-        const erro = 'Desculpe, ocorreu um erro. Tente novamente.'
-        setResposta(erro)
-        falar(erro)
+        setResposta('Erro. Tente novamente.')
         setStatus('idle')
       }
     }
+
     recognition.onerror = () => setStatus('idle')
-    recognition.onend = () => { if (status === 'ouvindo') setStatus('idle') }
+    recognition.onend = () => {
+      if (statusRef.current === 'ouvindo') setStatus('idle')
+    }
+
     recognition.start()
-  }, [historico, falar, status])
+  }, [historico, falar])
 
   const parar = useCallback(() => {
-    recognitionRef.current?.stop()
     window.speechSynthesis.cancel()
+    recognitionRef.current?.stop()
     setStatus('idle')
   }, [])
 
   const limparHistorico = useCallback(() => {
+    window.speechSynthesis.cancel()
+    recognitionRef.current?.stop()
     setHistorico([])
     setTranscricao('')
     setResposta('')
+    setStatus('idle')
   }, [])
 
   return { status, transcricao, resposta, historico, ouvir, parar, limparHistorico }

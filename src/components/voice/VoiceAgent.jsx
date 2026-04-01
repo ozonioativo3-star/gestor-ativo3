@@ -4,7 +4,7 @@ const statusConfig = {
   idle:      { cor: '#0F6E56', label: 'Toque para ativar a Ativa', pulso: false },
   ouvindo:   { cor: '#185FA5', label: 'Ouvindo...', pulso: true },
   pensando:  { cor: '#854F0B', label: 'Pensando...', pulso: true },
-  falando:   { cor: '#534AB7', label: 'Falando...', pulso: true },
+  falando:   { cor: '#534AB7', label: 'Toque para interromper', pulso: true },
 }
 
 export default function VoiceAgent() {
@@ -22,12 +22,12 @@ export default function VoiceAgent() {
         {cfg.pulso && <div style={{ ...styles.pulso, borderColor: cfg.cor }} />}
         <button
           style={{ ...styles.btn, background: cfg.cor }}
-          onClick={status === 'idle' ? ouvir : parar}
+          onClick={status === 'idle' ? ouvir : status === 'falando' ? parar : parar}
         >
           {status === 'idle'     && <MicIcon />}
           {status === 'ouvindo'  && <OndasIcon />}
           {status === 'pensando' && <SpinnerIcon />}
-          {status === 'falando'  && <SpeakerIcon />}
+          {status === 'falando'  && <PararIcon />}
         </button>
       </div>
 
@@ -78,6 +78,11 @@ const SpinnerIcon = () => (
     <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
   </svg>
 )
+const PararIcon = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
+    <rect x="6" y="6" width="12" height="12" rx="2"/>
+  </svg>
+)
 const SpeakerIcon = () => (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
@@ -93,7 +98,7 @@ const styles = {
   btnWrap: { position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '8px 0' },
   pulso: { position: 'absolute', width: '100px', height: '100px', borderRadius: '50%', border: '2px solid', opacity: 0.3, animation: 'pulso 1.5s ease-out infinite' },
   btn: { width: '80px', height: '80px', borderRadius: '50%', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' },
-  statusLabel: { fontSize: '14px', fontWeight: '500', transition: 'color 0.3s' },
+  statusLabel: { fontSize: '14px', fontWeight: '500', transition: 'color 0.3s', textAlign: 'center' },
   card: { width: '100%', background: '#F1EFE8', border: '1px solid #D3D1C7', borderRadius: '12px', padding: '14px 16px' },
   cardLabel: { fontSize: '11px', color: '#888780', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' },
   cardText: { fontSize: '15px', color: '#2C2C2A', marginTop: '6px', lineHeight: '1.6' },
